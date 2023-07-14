@@ -5,6 +5,8 @@
 #ifndef FLUTTER_FML_PLATFORM_ANDROID_NDK_HELPERS_H_
 #define FLUTTER_FML_PLATFORM_ANDROID_NDK_HELPERS_H_
 
+#include "flutter/fml/time/time_point.h"
+
 #include <EGL/egl.h>
 #include <android/choreographer.h>
 #include <android/hardware_buffer.h>
@@ -24,6 +26,8 @@ enum class ChoreographerSupportStatus {
   kSupported32,
   // Available, but only with postFrameCallback64.
   kSupported64,
+  // Available with postVsyncCallback.
+  kSupportedVsync,
 };
 
 // A collection of NDK functions that are available depending on the version of
@@ -69,6 +73,20 @@ class NDKHelpers {
       AChoreographer_frameCallback64 _Nonnull callback,
       void* _Nullable data);
 
+  // API Version 33
+  static void AChoreographer_postVsyncCallback(
+      AChoreographer* _Nonnull choreographer,
+      AChoreographer_vsyncCallback _Nonnull callback,
+      void* _Nullable data);
+  static fml::TimePoint AChoreographerFrameCallbackData_getFrameTime(
+      const AChoreographerFrameCallbackData* _Nonnull data);
+  static fml::TimePoint AChoreographerFrameCallbackData_getFrameDeadline(
+      const AChoreographerFrameCallbackData* _Nonnull data,
+      size_t latency_in_frames);
+  static int64_t AChoreographerFrameCallbackData_getFrameVsyncId(
+      const AChoreographerFrameCallbackData* _Nonnull data,
+      size_t latency_in_frames);
+
   static bool SurfaceControlAndTransactionSupported();
 
   static ASurfaceControl* _Nonnull ASurfaceControl_createFromWindow(
@@ -87,12 +105,20 @@ class NDKHelpers {
       ASurfaceControl* _Nonnull surface_control,
       AHardwareBuffer* _Nonnull buffer,
       int acquire_fence_fd);
+  static void ASurfaceTransaction_setFrameTimeline(
+      ASurfaceTransaction* _Nonnull transaction,
+      int64_t vsync_id);
 
   // API Version 31
 
   // Returns std::nullopt on API version 26 - 30.
   static std::optional<HardwareBufferKey> AHardwareBuffer_getId(
       AHardwareBuffer* _Nonnull buffer);
+
+ private:
+  static int64_t AChoreographerFrameCallbackData_getFrameTimelineIndex(
+      const AChoreographerFrameCallbackData* _Nonnull data,
+      size_t latency_in_frames);
 };
 
 }  // namespace flutter

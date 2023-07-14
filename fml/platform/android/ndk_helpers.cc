@@ -56,6 +56,9 @@ DECLARE_TYPES(void,
                ASurfaceControl* surface_control,
                AHardwareBuffer* buffer,
                int acquire_fence_fd));
+DECLARE_TYPES(void,
+              ASurfaceTransaction_setFrameTimeline,
+              (ASurfaceTransaction * transaction, int64_t vsyncId));
 
 DECLARE_TYPES(AChoreographer*, AChoreographer_getInstance, (void));
 DECLARE_TYPES(void,
@@ -68,6 +71,26 @@ DECLARE_TYPES(void,
               (AChoreographer * choreographer,
                AChoreographer_frameCallback64 callbackk,
                void* data));
+DECLARE_TYPES(void,
+              AChoreographer_postVsyncCallback,
+              (AChoreographer * choreographer,
+               AChoreographer_vsyncCallback callbackk,
+               void* data));
+DECLARE_TYPES(int64_t,
+              AChoreographerFrameCallbackData_getFrameTimeNanos,
+              (const AChoreographerFrameCallbackData* data));
+DECLARE_TYPES(size_t,
+              AChoreographerFrameCallbackData_getPreferredFrameTimelineIndex,
+              (const AChoreographerFrameCallbackData* data));
+DECLARE_TYPES(size_t,
+              AChoreographerFrameCallbackData_getFrameTimelinesLength,
+              (const AChoreographerFrameCallbackData* data));
+DECLARE_TYPES(int64_t,
+              AChoreographerFrameCallbackData_getFrameTimelineDeadlineNanos,
+              (const AChoreographerFrameCallbackData* data, size_t index));
+DECLARE_TYPES(int64_t,
+              AChoreographerFrameCallbackData_getFrameTimelineVsyncId,
+              (const AChoreographerFrameCallbackData* data, size_t index));
 
 DECLARE_TYPES(EGLClientBuffer,
               eglGetNativeClientBufferANDROID,
@@ -109,6 +132,14 @@ void InitOnceCallback() {
       LOOKUP(android, AChoreographer_postFrameCallback);
     }
 #endif
+    LOOKUP(android, AChoreographer_postVsyncCallback);
+    LOOKUP(android, AChoreographerFrameCallbackData_getFrameTimeNanos);
+    LOOKUP(android,
+           AChoreographerFrameCallbackData_getPreferredFrameTimelineIndex);
+    LOOKUP(android, AChoreographerFrameCallbackData_getFrameTimelinesLength);
+    LOOKUP(android,
+           AChoreographerFrameCallbackData_getFrameTimelineDeadlineNanos);
+    LOOKUP(android, AChoreographerFrameCallbackData_getFrameTimelineVsyncId);
   }
 
   LOOKUP(android, ASurfaceControl_createFromWindow);
@@ -117,6 +148,7 @@ void InitOnceCallback() {
   LOOKUP(android, ASurfaceTransaction_create);
   LOOKUP(android, ASurfaceTransaction_delete);
   LOOKUP(android, ASurfaceTransaction_setBuffer);
+  LOOKUP(android, ASurfaceTransaction_setFrameTimeline);
 #undef LOOKUP
 }
 
@@ -134,6 +166,9 @@ bool NDKHelpers::ATrace_isEnabled() {
 }
 
 ChoreographerSupportStatus NDKHelpers::ChoreographerSupported() {
+  if (_AChoreographer_postVsyncCallback) {
+    return ChoreographerSupportStatus::kSupportedVsync;
+  }
   if (_AChoreographer_postFrameCallback64) {
     return ChoreographerSupportStatus::kSupported64;
   }
@@ -162,6 +197,53 @@ void NDKHelpers::AChoreographer_postFrameCallback64(
     void* data) {
   FML_CHECK(_AChoreographer_postFrameCallback64);
   return _AChoreographer_postFrameCallback64(choreographer, callback, data);
+}
+
+void NDKHelpers::AChoreographer_postVsyncCallback(
+    AChoreographer* choreographer,
+    AChoreographer_vsyncCallback callback,
+    void* data) {
+  FML_CHECK(_AChoreographer_postVsyncCallback);
+  return _AChoreographer_postVsyncCallback(choreographer, callback, data);
+}
+
+int64_t NDKHelpers::AChoreographerFrameCallbackData_getFrameTimelineIndex(
+    const AChoreographerFrameCallbackData* data,
+    size_t latency_in_frames) {
+  FML_CHECK(_AChoreographerFrameCallbackData_getPreferredFrameTimelineIndex);
+  FML_CHECK(_AChoreographerFrameCallbackData_getFrameTimelinesLength);
+  size_t preferred_index =
+      _AChoreographerFrameCallbackData_getPreferredFrameTimelineIndex(data) +
+      latency_in_frames;
+  return std::min(
+      preferred_index,
+      _AChoreographerFrameCallbackData_getFrameTimelinesLength(data) - 1);
+}
+
+fml::TimePoint NDKHelpers::AChoreographerFrameCallbackData_getFrameTime(
+    const AChoreographerFrameCallbackData* data) {
+  FML_CHECK(_AChoreographerFrameCallbackData_getFrameTimeNanos);
+  return fml::TimePoint::FromEpochDelta(fml::TimeDelta::FromNanoseconds(
+      _AChoreographerFrameCallbackData_getFrameTimeNanos(data)));
+}
+
+fml::TimePoint NDKHelpers::AChoreographerFrameCallbackData_getFrameDeadline(
+    const AChoreographerFrameCallbackData* data,
+    size_t latency_in_frames) {
+  FML_CHECK(_AChoreographerFrameCallbackData_getFrameTimelineDeadlineNanos);
+  return fml::TimePoint::FromEpochDelta(fml::TimeDelta::FromNanoseconds(
+      _AChoreographerFrameCallbackData_getFrameTimelineDeadlineNanos(
+          data, AChoreographerFrameCallbackData_getFrameTimelineIndex(
+                    data, latency_in_frames))));
+}
+
+int64_t NDKHelpers::AChoreographerFrameCallbackData_getFrameVsyncId(
+    const AChoreographerFrameCallbackData* data,
+    size_t latency_in_frames) {
+  FML_CHECK(_AChoreographerFrameCallbackData_getFrameTimelineVsyncId);
+  return _AChoreographerFrameCallbackData_getFrameTimelineVsyncId(
+      data, AChoreographerFrameCallbackData_getFrameTimelineIndex(
+                data, latency_in_frames));
 }
 
 bool NDKHelpers::HardwareBufferSupported() {
@@ -248,6 +330,13 @@ void NDKHelpers::ASurfaceTransaction_setBuffer(ASurfaceTransaction* transaction,
   FML_CHECK(_ASurfaceTransaction_setBuffer);
   _ASurfaceTransaction_setBuffer(transaction, surface_control, buffer,
                                  acquire_fence_fd);
+}
+
+void NDKHelpers::ASurfaceTransaction_setFrameTimeline(
+    ASurfaceTransaction* transaction,
+    int64_t vsync_id) {
+  FML_CHECK(_ASurfaceTransaction_setFrameTimeline);
+  _ASurfaceTransaction_setFrameTimeline(transaction, vsync_id);
 }
 
 int NDKHelpers::AHardwareBuffer_isSupported(const AHardwareBuffer_Desc* desc) {
