@@ -36,9 +36,6 @@ class HtmlRenderer implements Renderer {
   }
 
   @override
-  void reset(FlutterViewEmbedder embedder) {}
-
-  @override
   ui.Paint createPaint() => SurfacePaint();
 
   @override
@@ -323,7 +320,7 @@ class HtmlRenderer implements Renderer {
     CanvasParagraphBuilder(style as EngineParagraphStyle);
 
   @override
-  void renderScene(ui.Scene scene, ui.FlutterView view) {
+  void renderScene(ui.Scene scene, EngineFlutterView view) {
     final EngineFlutterView implicitView = EnginePlatformDispatcher.instance.implicitView!;
     implicitView.dom.setScene((scene as SurfaceScene).webOnlyRootElement!);
     frameTimingsOnRasterFinish();

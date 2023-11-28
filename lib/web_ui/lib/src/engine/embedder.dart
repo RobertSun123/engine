@@ -63,8 +63,6 @@ class FlutterViewEmbedder {
       },
     );
 
-    renderer.reset(this);
-
     window.onResize.listen(_metricsDidChange);
   }
 

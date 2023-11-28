@@ -759,6 +759,7 @@ class EnginePlatformDispatcher extends ui.PlatformDispatcher {
       // If there is no view to render into, then this is a no-op.
       return;
     }
+    view as EngineFlutterView?;
     renderer.renderScene(scene, view ?? implicitView!);
   }
 

@@ -14,7 +14,7 @@ import 'package:ui/ui_web/src/ui_web.dart' as ui_web;
 
 class SkwasmRenderer implements Renderer {
   late SkwasmSurface surface;
-  late EngineSceneView sceneView;
+  final Map<EngineFlutterView, EngineSceneView> _sceneViews = <EngineFlutterView, EngineSceneView>{};
 
   @override
   final SkwasmFontCollection fontCollection = SkwasmFontCollection();
@@ -348,7 +348,6 @@ class SkwasmRenderer implements Renderer {
   @override
   FutureOr<void> initialize() {
     surface = SkwasmSurface();
-    sceneView = EngineSceneView(SkwasmPictureRenderer(surface));
   }
 
   @override
@@ -398,21 +397,20 @@ class SkwasmRenderer implements Renderer {
     return decoder;
   }
 
-  // TODO(harryterkelsen): Add multiview support,
-  // https://github.com/flutter/flutter/issues/137073.
   @override
-  Future<void> renderScene(ui.Scene scene, ui.FlutterView view) =>
-      sceneView.renderScene(scene as EngineScene);
+  Future<void> renderScene(ui.Scene scene, EngineFlutterView view) {
+    final EngineSceneView sceneView = _getSceneViewForView(view);
+    return sceneView.renderScene(scene as EngineScene);
+  }
+
+  EngineSceneView _getSceneViewForView(EngineFlutterView view) {
+    return _sceneViews.putIfAbsent(view, () {
+      return EngineSceneView(SkwasmPictureRenderer(surface));
+    });
+  }
 
   @override
   String get rendererTag => 'skwasm';
-
-  @override
-  void reset(FlutterViewEmbedder embedder) {
-    // TODO(harryterkelsen): Do this operation on the appropriate Flutter View.
-    final EngineFlutterView implicitView = EnginePlatformDispatcher.instance.implicitView!;
-    implicitView.dom.setScene(sceneView.sceneElement);
-  }
 
   static final Map<String, Future<ui.FragmentProgram>> _programs = <String, Future<ui.FragmentProgram>>{};
 

@@ -70,11 +70,6 @@ class CanvasKitRenderer implements Renderer {
   }
 
   @override
-  void reset(FlutterViewEmbedder embedder) {
-    // No work required.
-  }
-
-  @override
   ui.Paint createPaint() => CkPaint();
 
   @override
@@ -383,7 +378,7 @@ class CanvasKitRenderer implements Renderer {
     CkParagraphBuilder(style);
 
   @override
-  void renderScene(ui.Scene scene, ui.FlutterView view) {
+  void renderScene(ui.Scene scene, EngineFlutterView view) {
     // "Build finish" and "raster start" happen back-to-back because we
     // render on the same thread, so there's no overhead from hopping to
     // another thread.
@@ -397,8 +392,7 @@ class CanvasKitRenderer implements Renderer {
     // TODO(harryterkelsen): Use `FlutterViewManager.onViewsChanged` to manage
     // the lifecycle of Rasterizers,
     // https://github.com/flutter/flutter/issues/137073.
-    final Rasterizer rasterizer =
-        _getRasterizerForView(view as EngineFlutterView);
+    final Rasterizer rasterizer = _getRasterizerForView(view);
 
     rasterizer.draw((scene as LayerScene).layerTree);
     frameTimingsOnRasterFinish();
