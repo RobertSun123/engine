@@ -34,7 +34,7 @@ GeometryResult Geometry::ComputePositionGeometry(
       .type = generator.GetTriangleType(),
       .vertex_buffer =
           {
-              .vertex_buffer = renderer.GetTransientsBuffer().Emplace(
+              .vertex_buffers = renderer.GetTransientsBuffer().Emplace(
                   count * sizeof(VT), alignof(VT),
                   [&generator](uint8_t* buffer) {
                     auto vertices = reinterpret_cast<VT*>(buffer);
@@ -68,7 +68,7 @@ GeometryResult Geometry::ComputePositionUVGeometry(
       .type = generator.GetTriangleType(),
       .vertex_buffer =
           {
-              .vertex_buffer = renderer.GetTransientsBuffer().Emplace(
+              .vertex_buffers = renderer.GetTransientsBuffer().Emplace(
                   count * sizeof(VT), alignof(VT),
                   [&generator, &uv_transform](uint8_t* buffer) {
                     auto vertices = reinterpret_cast<VT*>(buffer);
@@ -132,7 +132,7 @@ GeometryResult ComputeUVGeometryForRect(Rect source_rect,
       .type = PrimitiveType::kTriangleStrip,
       .vertex_buffer =
           {
-              .vertex_buffer = host_buffer.Emplace(
+              .vertex_buffers = host_buffer.Emplace(
                   data.data(), 16 * sizeof(float), alignof(float)),
               .vertex_count = 4,
               .index_type = IndexType::kNone,
