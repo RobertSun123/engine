@@ -5866,6 +5866,8 @@ ORIGIN: ../../../flutter/lib/ui/window/platform_configuration.cc + ../../../flut
 ORIGIN: ../../../flutter/lib/ui/window/platform_configuration.h + ../../../flutter/LICENSE
 ORIGIN: ../../../flutter/lib/ui/window/platform_message.cc + ../../../flutter/LICENSE
 ORIGIN: ../../../flutter/lib/ui/window/platform_message.h + ../../../flutter/LICENSE
+ORIGIN: ../../../flutter/lib/ui/window/platform_message_listener_dart_port.cc + ../../../flutter/LICENSE
+ORIGIN: ../../../flutter/lib/ui/window/platform_message_listener_dart_port.h + ../../../flutter/LICENSE
 ORIGIN: ../../../flutter/lib/ui/window/platform_message_response.cc + ../../../flutter/LICENSE
 ORIGIN: ../../../flutter/lib/ui/window/platform_message_response.h + ../../../flutter/LICENSE
 ORIGIN: ../../../flutter/lib/ui/window/platform_message_response_dart.cc + ../../../flutter/LICENSE
@@ -8708,6 +8710,8 @@ FILE: ../../../flutter/lib/ui/window/platform_configuration.cc
 FILE: ../../../flutter/lib/ui/window/platform_configuration.h
 FILE: ../../../flutter/lib/ui/window/platform_message.cc
 FILE: ../../../flutter/lib/ui/window/platform_message.h
+FILE: ../../../flutter/lib/ui/window/platform_message_listener_dart_port.cc
+FILE: ../../../flutter/lib/ui/window/platform_message_listener_dart_port.h
 FILE: ../../../flutter/lib/ui/window/platform_message_response.cc
 FILE: ../../../flutter/lib/ui/window/platform_message_response.h
 FILE: ../../../flutter/lib/ui/window/platform_message_response_dart.cc
