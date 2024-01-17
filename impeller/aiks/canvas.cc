@@ -133,6 +133,37 @@ void Canvas::Save() {
   Save(false);
 }
 
+namespace {
+class MipCountVisitor : public ImageFilterVisitor {
+ public:
+  virtual void Visit(const BlurImageFilter& filter) {
+    required_mip_count_ = FilterContents::kBlurFilterRequiredMipCount;
+  }
+  virtual void Visit(const LocalMatrixImageFilter& filter) {
+    required_mip_count_ = 1;
+  }
+  virtual void Visit(const DilateImageFilter& filter) {
+    required_mip_count_ = 1;
+  }
+  virtual void Visit(const ErodeImageFilter& filter) {
+    required_mip_count_ = 1;
+  }
+  virtual void Visit(const MatrixImageFilter& filter) {
+    required_mip_count_ = 1;
+  }
+  virtual void Visit(const ComposeImageFilter& filter) {
+    required_mip_count_ = 1;
+  }
+  virtual void Visit(const ColorImageFilter& filter) {
+    required_mip_count_ = 1;
+  }
+  int32_t GetRequiredMipCount() const { return required_mip_count_; }
+
+ private:
+  int32_t required_mip_count_ = -1;
+};
+}  // namespace
+
 void Canvas::Save(bool create_subpass,
                   BlendMode blend_mode,
                   const std::shared_ptr<ImageFilter>& backdrop_filter) {
@@ -156,6 +187,11 @@ void Canvas::Save(bool create_subpass,
             return filter;
           };
       subpass->SetBackdropFilter(backdrop_filter_proc);
+      MipCountVisitor mip_count_visitor;
+      backdrop_filter->Visit(mip_count_visitor);
+      current_pass_->SetRequiredMipCount(
+          std::max(current_pass_->GetRequiredMipCount(),
+                   mip_count_visitor.GetRequiredMipCount()));
     }
     subpass->SetBlendMode(blend_mode);
     current_pass_ = GetCurrentPass().AddSubpass(std::move(subpass));
@@ -281,7 +317,7 @@ bool Canvas::AttemptDrawBlurredRRect(const Rect& rect,
   }
   // A blur sigma that is close to zero should not result in any shadow.
   if (std::fabs(paint.mask_blur_descriptor->sigma.sigma) <= kEhCloseEnough) {
-    return true;
+    return false;
   }
 
   Paint new_paint = paint;
@@ -341,7 +377,7 @@ void Canvas::DrawRect(const Rect& rect, const Paint& paint) {
 void Canvas::DrawOval(const Rect& rect, const Paint& paint) {
   if (rect.IsSquare()) {
     // Circles have slightly less overhead and can do stroking
-    DrawCircle(rect.GetCenter(), rect.GetSize().width * 0.5f, paint);
+    DrawCircle(rect.GetCenter(), rect.GetWidth() * 0.5f, paint);
     return;
   }
 
@@ -365,27 +401,31 @@ void Canvas::DrawOval(const Rect& rect, const Paint& paint) {
   GetCurrentPass().AddEntity(std::move(entity));
 }
 
-void Canvas::DrawRRect(Rect rect, Point corner_radii, const Paint& paint) {
-  if (corner_radii.x == corner_radii.y &&
-      AttemptDrawBlurredRRect(rect, corner_radii.x, paint)) {
+void Canvas::DrawRRect(const Rect& rect,
+                       const Size& corner_radii,
+                       const Paint& paint) {
+  if (corner_radii.IsSquare() &&
+      AttemptDrawBlurredRRect(rect, corner_radii.width, paint)) {
     return;
   }
-  auto path = PathBuilder{}
-                  .SetConvexity(Convexity::kConvex)
-                  .AddRoundedRect(rect, corner_radii)
-                  .SetBounds(rect)
-                  .TakePath();
+
   if (paint.style == Paint::Style::kFill) {
     Entity entity;
     entity.SetTransform(GetCurrentTransform());
     entity.SetClipDepth(GetClipDepth());
     entity.SetBlendMode(paint.blend_mode);
     entity.SetContents(CreateContentsForGeometryWithFilters(
-        paint, Geometry::MakeFillPath(std::move(path))));
+        paint, Geometry::MakeRoundRect(rect, corner_radii)));
 
     GetCurrentPass().AddEntity(std::move(entity));
     return;
   }
+
+  auto path = PathBuilder{}
+                  .SetConvexity(Convexity::kConvex)
+                  .AddRoundedRect(rect, corner_radii)
+                  .SetBounds(rect)
+                  .TakePath();
   DrawPath(std::move(path), paint);
 }
 
@@ -444,23 +484,33 @@ void Canvas::ClipRect(const Rect& rect, Entity::ClipOperation clip_op) {
   }
 }
 
-void Canvas::ClipRRect(const Rect& rect,
-                       Point corner_radii,
-                       Entity::ClipOperation clip_op) {
-  auto path = PathBuilder{}
-                  .SetConvexity(Convexity::kConvex)
-                  .AddRoundedRect(rect, corner_radii)
-                  .SetBounds(rect)
-                  .TakePath();
+void Canvas::ClipOval(const Rect& bounds, Entity::ClipOperation clip_op) {
+  auto geometry = Geometry::MakeOval(bounds);
+  auto& cull_rect = transform_stack_.back().cull_rect;
+  if (clip_op == Entity::ClipOperation::kIntersect &&                      //
+      cull_rect.has_value() &&                                             //
+      geometry->CoversArea(transform_stack_.back().transform, *cull_rect)  //
+  ) {
+    return;  // This clip will do nothing, so skip it.
+  }
 
-  auto size = rect.GetSize();
+  ClipGeometry(geometry, clip_op);
+  switch (clip_op) {
+    case Entity::ClipOperation::kIntersect:
+      IntersectCulling(bounds);
+      break;
+    case Entity::ClipOperation::kDifference:
+      break;
+  }
+}
+
+void Canvas::ClipRRect(const Rect& rect,
+                       const Size& corner_radii,
+                       Entity::ClipOperation clip_op) {
   // Does the rounded rect have a flat part on the top/bottom or left/right?
-  bool flat_on_TB = corner_radii.x * 2 < size.width;
-  bool flat_on_LR = corner_radii.y * 2 < size.height;
-  std::optional<Rect> inner_rect = (flat_on_LR && flat_on_TB)
-                                       ? rect.Expand(-corner_radii)
-                                       : std::make_optional<Rect>();
-  auto geometry = Geometry::MakeFillPath(std::move(path), inner_rect);
+  bool flat_on_TB = corner_radii.width * 2 < rect.GetWidth();
+  bool flat_on_LR = corner_radii.height * 2 < rect.GetHeight();
+  auto geometry = Geometry::MakeRoundRect(rect, corner_radii);
   auto& cull_rect = transform_stack_.back().cull_rect;
   if (clip_op == Entity::ClipOperation::kIntersect &&                      //
       cull_rect.has_value() &&                                             //
@@ -475,7 +525,7 @@ void Canvas::ClipRRect(const Rect& rect,
       IntersectCulling(rect);
       break;
     case Entity::ClipOperation::kDifference:
-      if (corner_radii.x <= 0.0 || corner_radii.y <= 0) {
+      if (corner_radii.IsEmpty()) {
         SubtractCulling(rect);
       } else {
         // We subtract the inner "tall" and "wide" rectangle pieces
@@ -484,10 +534,10 @@ void Canvas::ClipRRect(const Rect& rect,
         // Since this is a subtract operation, we can subtract each
         // rectangle piece individually without fear of interference.
         if (flat_on_TB) {
-          SubtractCulling(rect.Expand({-corner_radii.x, 0.0}));
+          SubtractCulling(rect.Expand(Size{-corner_radii.width, 0.0}));
         }
         if (flat_on_LR) {
-          SubtractCulling(rect.Expand({0.0, -corner_radii.y}));
+          SubtractCulling(rect.Expand(Size{0.0, -corner_radii.height}));
         }
       }
       break;
@@ -614,7 +664,8 @@ void Canvas::DrawImageRect(const std::shared_ptr<Image>& image,
                            Rect source,
                            Rect dest,
                            const Paint& paint,
-                           SamplerDescriptor sampler) {
+                           SamplerDescriptor sampler,
+                           SourceRectConstraint src_rect_constraint) {
   if (!image || source.IsEmpty() || dest.IsEmpty()) {
     return;
   }
@@ -628,6 +679,8 @@ void Canvas::DrawImageRect(const std::shared_ptr<Image>& image,
   auto contents = TextureContents::MakeRect(dest);
   contents->SetTexture(image->GetTexture());
   contents->SetSourceRect(source);
+  contents->SetStrictSourceRect(src_rect_constraint ==
+                                SourceRectConstraint::kStrict);
   contents->SetSamplerDescriptor(std::move(sampler));
   contents->SetOpacity(paint.color.alpha);
   contents->SetDeferApplyingOpacity(paint.HasColorFilter());
@@ -666,8 +719,22 @@ void Canvas::SaveLayer(const Paint& paint,
   TRACE_EVENT0("flutter", "Canvas::saveLayer");
   Save(true, paint.blend_mode, backdrop_filter);
 
+  // The DisplayList bounds/rtree doesn't account for filters applied to parent
+  // layers, and so sub-DisplayLists are getting culled as if no filters are
+  // applied.
+  // See also: https://github.com/flutter/flutter/issues/139294
+  if (paint.image_filter) {
+    transform_stack_.back().cull_rect = std::nullopt;
+  }
+
   auto& new_layer_pass = GetCurrentPass();
   new_layer_pass.SetBoundsLimit(bounds);
+
+  if (paint.image_filter) {
+    MipCountVisitor mip_count_visitor;
+    paint.image_filter->Visit(mip_count_visitor);
+    new_layer_pass.SetRequiredMipCount(mip_count_visitor.GetRequiredMipCount());
+  }
 
   // Only apply opacity peephole on default blending.
   if (paint.blend_mode == BlendMode::kSourceOver) {

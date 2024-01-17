@@ -7,6 +7,7 @@
 #include <memory>
 #include <optional>
 
+#include "impeller/entity/contents/content_context.h"
 #include "impeller/entity/geometry/circle_geometry.h"
 #include "impeller/entity/geometry/cover_geometry.h"
 #include "impeller/entity/geometry/ellipse_geometry.h"
@@ -14,12 +15,14 @@
 #include "impeller/entity/geometry/line_geometry.h"
 #include "impeller/entity/geometry/point_field_geometry.h"
 #include "impeller/entity/geometry/rect_geometry.h"
+#include "impeller/entity/geometry/round_rect_geometry.h"
 #include "impeller/entity/geometry/stroke_path_geometry.h"
 #include "impeller/geometry/rect.h"
 
 namespace impeller {
 
 GeometryResult Geometry::ComputePositionGeometry(
+    const ContentContext& renderer,
     const Tessellator::VertexGenerator& generator,
     const Entity& entity,
     RenderPass& pass) {
@@ -31,7 +34,7 @@ GeometryResult Geometry::ComputePositionGeometry(
       .type = generator.GetTriangleType(),
       .vertex_buffer =
           {
-              .vertex_buffer = pass.GetTransientsBuffer().Emplace(
+              .vertex_buffer = renderer.GetTransientsBuffer().Emplace(
                   count * sizeof(VT), alignof(VT),
                   [&generator](uint8_t* buffer) {
                     auto vertices = reinterpret_cast<VT*>(buffer);
@@ -46,13 +49,13 @@ GeometryResult Geometry::ComputePositionGeometry(
               .vertex_count = count,
               .index_type = IndexType::kNone,
           },
-      .transform = Matrix::MakeOrthographic(pass.GetRenderTargetSize()) *
-                   entity.GetTransform(),
+      .transform = pass.GetOrthographicTransform() * entity.GetTransform(),
       .prevent_overdraw = false,
   };
 }
 
 GeometryResult Geometry::ComputePositionUVGeometry(
+    const ContentContext& renderer,
     const Tessellator::VertexGenerator& generator,
     const Matrix& uv_transform,
     const Entity& entity,
@@ -65,7 +68,7 @@ GeometryResult Geometry::ComputePositionUVGeometry(
       .type = generator.GetTriangleType(),
       .vertex_buffer =
           {
-              .vertex_buffer = pass.GetTransientsBuffer().Emplace(
+              .vertex_buffer = renderer.GetTransientsBuffer().Emplace(
                   count * sizeof(VT), alignof(VT),
                   [&generator, &uv_transform](uint8_t* buffer) {
                     auto vertices = reinterpret_cast<VT*>(buffer);
@@ -82,8 +85,7 @@ GeometryResult Geometry::ComputePositionUVGeometry(
               .vertex_count = count,
               .index_type = IndexType::kNone,
           },
-      .transform = Matrix::MakeOrthographic(pass.GetRenderTargetSize()) *
-                   entity.GetTransform(),
+      .transform = pass.GetOrthographicTransform() * entity.GetTransform(),
       .prevent_overdraw = false,
   };
 }
@@ -115,7 +117,7 @@ GeometryResult ComputeUVGeometryForRect(Rect source_rect,
                                         const ContentContext& renderer,
                                         const Entity& entity,
                                         RenderPass& pass) {
-  auto& host_buffer = pass.GetTransientsBuffer();
+  auto& host_buffer = renderer.GetTransientsBuffer();
 
   auto uv_transform =
       texture_coverage.GetNormalizingTransform() * effect_transform;
@@ -135,8 +137,7 @@ GeometryResult ComputeUVGeometryForRect(Rect source_rect,
               .vertex_count = 4,
               .index_type = IndexType::kNone,
           },
-      .transform = Matrix::MakeOrthographic(pass.GetRenderTargetSize()) *
-                   entity.GetTransform(),
+      .transform = pass.GetOrthographicTransform() * entity.GetTransform(),
       .prevent_overdraw = false,
   };
 }
@@ -202,6 +203,11 @@ std::shared_ptr<Geometry> Geometry::MakeStrokedCircle(const Point& center,
                                                       Scalar radius,
                                                       Scalar stroke_width) {
   return std::make_shared<CircleGeometry>(center, radius, stroke_width);
+}
+
+std::shared_ptr<Geometry> Geometry::MakeRoundRect(const Rect& rect,
+                                                  const Size& radii) {
+  return std::make_shared<RoundRectGeometry>(rect, radii);
 }
 
 bool Geometry::CoversArea(const Matrix& transform, const Rect& rect) const {

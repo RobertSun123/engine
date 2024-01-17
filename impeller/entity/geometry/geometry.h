@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#pragma once
+#ifndef FLUTTER_IMPELLER_ENTITY_GEOMETRY_GEOMETRY_H_
+#define FLUTTER_IMPELLER_ENTITY_GEOMETRY_GEOMETRY_H_
 
 #include "impeller/core/formats.h"
 #include "impeller/core/vertex_buffer.h"
@@ -85,6 +86,9 @@ class Geometry {
                                                      Scalar radius,
                                                      Scalar stroke_width);
 
+  static std::shared_ptr<Geometry> MakeRoundRect(const Rect& rect,
+                                                 const Size& radii);
+
   static std::shared_ptr<Geometry> MakePointField(std::vector<Point> points,
                                                   Scalar radius,
                                                   bool round);
@@ -119,11 +123,13 @@ class Geometry {
 
  protected:
   static GeometryResult ComputePositionGeometry(
+      const ContentContext& renderer,
       const Tessellator::VertexGenerator& generator,
       const Entity& entity,
       RenderPass& pass);
 
   static GeometryResult ComputePositionUVGeometry(
+      const ContentContext& renderer,
       const Tessellator::VertexGenerator& generator,
       const Matrix& uv_transform,
       const Entity& entity,
@@ -131,3 +137,5 @@ class Geometry {
 };
 
 }  // namespace impeller
+
+#endif  // FLUTTER_IMPELLER_ENTITY_GEOMETRY_GEOMETRY_H_
