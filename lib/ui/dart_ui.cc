@@ -112,6 +112,8 @@ typedef CanvasPath Path;
   V(PlatformConfigurationNativeApi::SendPortPlatformMessage, 4)       \
   V(PlatformConfigurationNativeApi::SendChannelUpdate, 2)             \
   V(PlatformConfigurationNativeApi::GetScaledFontSize, 2)             \
+  V(PlatformConfigurationNativeApi::AddPlatformPortCallback, 2)       \
+  V(PlatformConfigurationNativeApi::RemovePlatformPortCallback, 1)    \
   V(DartRuntimeHooks::Logger_PrintDebugString, 1)                     \
   V(DartRuntimeHooks::Logger_PrintString, 1)                          \
   V(DartRuntimeHooks::ScheduleMicrotask, 1)                           \
