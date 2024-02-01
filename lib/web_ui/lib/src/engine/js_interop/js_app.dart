@@ -39,9 +39,9 @@ abstract class FlutterApp {
   }) =>
       FlutterApp._(
         addView: ((JsFlutterViewOptions options) =>
-            futureToPromise(addView(options) as Future<JSAny>)).toJS,
-        removeView: ((int id) =>
-            futureToPromise(removeView(id) as Future<JSObject?>)).toJS,
+            futureToPromise(addView(options).then((int id) => id.toJS))).toJS,
+        removeView: ((JSNumber id) =>
+            futureToPromise(removeView(id.toDartInt) as Future<JSObject?>)).toJS,
       );
   external factory FlutterApp._({
     required JSFunction addView,
