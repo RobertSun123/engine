@@ -405,7 +405,9 @@ class SkwasmRenderer implements Renderer {
 
   EngineSceneView _getSceneViewForView(EngineFlutterView view) {
     return _sceneViews.putIfAbsent(view, () {
-      return EngineSceneView(SkwasmPictureRenderer(surface));
+      final EngineSceneView sceneView = EngineSceneView(SkwasmPictureRenderer(surface));
+      view.dom.setScene(sceneView.sceneElement);
+      return sceneView;
     });
   }
 
