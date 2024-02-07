@@ -6,6 +6,7 @@ import 'dart:typed_data';
 
 import 'package:test/bootstrap/browser.dart';
 import 'package:test/test.dart';
+import 'package:ui/src/engine.dart' show renderer;
 import 'package:ui/ui.dart' as ui;
 import 'package:web_engine_tester/golden_tester.dart';
 
@@ -17,6 +18,12 @@ void main() {
 }
 
 void testMain() {
+  bool assertsEnabled = false;
+  assert(() {
+    assertsEnabled = true;
+    return true;
+  }());
+
   group('Vertices', () {
     setUpUnitTests(withImplicitView: true, setUpTestViewDimensions: false);
 
@@ -58,6 +65,148 @@ void testMain() {
     await drawPictureUsingCurrentRenderer(recorder.endRecording());
     await matchGoldenFile('ui_vertices_antialiased.png', region: region);
   }, skip: isHtml); // https://github.com/flutter/flutter/issues/127454
+
+  test('Vertices assert checks', () {
+    // We don't test textureCoordinate assert checks on html render because HTML renderer's SurfaceVertices() does not support textureCoordinates
+    if (renderer.rendererTag != 'html') {
+      try {
+        final ui.Vertices invalidVertices = ui.Vertices(
+          ui.VertexMode.triangles,
+          const <ui.Offset>[ui.Offset.zero, ui.Offset.zero, ui.Offset.zero],
+          textureCoordinates: const <ui.Offset>[ui.Offset.zero],
+        );
+        if (assertsEnabled) {
+          throw AssertionError('Vertices did not throw the expected assert error.');
+        } else {
+          // Assertions are NOT ENABLED, so we will attempt to use this invalid ui.Vertices object
+          // we just created to check if that causes exceptions/problems.
+          useAndDisposeOfInvalidVerticesObject(invalidVertices);
+        }
+      } on AssertionError catch (e) {
+        expect('$e', contains(r'\"positions\" and \"textureCoordinates\" lengths must match.'));
+      }
+    }
+    try {
+      final ui.Vertices invalidVertices = ui.Vertices(
+        ui.VertexMode.triangles,
+        const <ui.Offset>[ui.Offset.zero, ui.Offset.zero, ui.Offset.zero],
+        colors: const <ui.Color>[ui.Color.fromRGBO(255, 0, 0, 1.0)],
+      );
+      if (assertsEnabled) {
+        throw AssertionError('Vertices did not throw the expected assert error.');
+      } else {
+        // Assertions are NOT ENABLED, so we will attempt to use this invalid ui.Vertices object
+        // we just created to check if that causes exceptions/problems.
+        useAndDisposeOfInvalidVerticesObject(invalidVertices);
+      }
+    } on AssertionError catch (e) {
+      expect('$e', contains(r'\"positions\" and \"colors\" lengths must match.'));
+    }
+    try {
+      final ui.Vertices invalidVertices = ui.Vertices(
+        ui.VertexMode.triangles,
+        const <ui.Offset>[ui.Offset.zero, ui.Offset.zero, ui.Offset.zero],
+        indices: Uint16List.fromList(const <int>[0, 2, 5]),
+      );
+      if (assertsEnabled) {
+        throw AssertionError('Vertices did not throw the expected assert error.');
+      } else {
+        // Assertions are NOT ENABLED, so we will attempt to use this invalid ui.Vertices object
+        // we just created to check if that causes exceptions/problems.
+        useAndDisposeOfInvalidVerticesObject(invalidVertices);
+      }
+    } on AssertionError catch (e) {
+      expect('$e', contains(r'\"indices\" values must be valid indices in the positions list.'));
+    }
+    ui.Vertices( // This one does not throw.
+      ui.VertexMode.triangles,
+      const <ui.Offset>[ui.Offset.zero],
+    ).dispose();
+    ui.Vertices( // This one should not throw.
+      ui.VertexMode.triangles,
+      const <ui.Offset>[ui.Offset.zero, ui.Offset.zero, ui.Offset.zero],
+      indices: Uint16List.fromList(const <int>[0, 2, 1, 2, 0, 1, 2, 0]), // Uint16List implements List<int> so this is ok.
+    ).dispose();
+  });
+
+  test('Vertices.raw assert checks', () {
+    try {
+      final ui.Vertices invalidVertices = ui.Vertices.raw(
+        ui.VertexMode.triangles,
+        Float32List.fromList(const <double>[0.0]),
+      );
+      if (assertsEnabled) {
+        throw AssertionError('Vertices.raw did not throw the expected assert error.');
+      } else {
+        // Assertions are NOT ENABLED, so we will attempt to use this invalid ui.Vertices object
+        // we just created to check if that causes exceptions/problems.
+        useAndDisposeOfInvalidVerticesObject(invalidVertices);
+      }
+    } on AssertionError catch (e) {
+      expect('$e', contains(r'\"positions\" must have an even number of entries (each coordinate is an x,y pair).'));
+    }
+    // We don't test textureCoordinate assert checks on html render because HTML renderer's SurfaceVertices() does not support textureCoordinates
+    if (renderer.rendererTag != 'html') {
+      try {
+        final ui.Vertices invalidVertices = ui.Vertices.raw(
+          ui.VertexMode.triangles,
+          Float32List.fromList(const <double>[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]),
+          textureCoordinates: Float32List.fromList(const <double>[0.0, 0.0]),
+        );
+        if (assertsEnabled) {
+          throw AssertionError('Vertices did not throw the expected assert error.');
+        } else {
+          // Assertions are NOT ENABLED, so we will attempt to use this invalid ui.Vertices object
+          // we just created to check if that causes exceptions/problems.
+          useAndDisposeOfInvalidVerticesObject(invalidVertices);
+        }
+      } on AssertionError catch (e) {
+        expect('$e', contains(r'\"positions\" and \"textureCoordinates\" lengths must match.'));
+      }
+    }
+    try {
+      final ui.Vertices invalidVertices = ui.Vertices.raw(
+        ui.VertexMode.triangles,
+        Float32List.fromList(const <double>[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]),
+        colors: Int32List.fromList(const <int>[0xffff0000]),
+      );
+      if (assertsEnabled) {
+        throw AssertionError('Vertices did not throw the expected assert error.');
+      } else {
+        // Assertions are NOT ENABLED, so we will attempt to use this invalid ui.Vertices object
+        // we just created to check if that causes exceptions/problems.
+        useAndDisposeOfInvalidVerticesObject(invalidVertices);
+      }
+    } on AssertionError catch (e) {
+      expect('$e', contains(r'\"colors\" length must be half the length of \"positions\".'));
+    }
+    try {
+      final ui.Vertices invalidVertices = ui.Vertices.raw(
+        ui.VertexMode.triangles,
+        Float32List.fromList(const <double>[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]),
+        indices: Uint16List.fromList(const <int>[0, 2, 5]),
+      );
+      if (assertsEnabled) {
+        throw AssertionError('Vertices.raw did not throw the expected assert error.');
+      } else {
+        // Assertions are NOT ENABLED, so we will attempt to use this invalid ui.Vertices object
+        // we just created to check if that causes exceptions/problems.
+        useAndDisposeOfInvalidVerticesObject(invalidVertices);
+      }
+    } on AssertionError catch (e) {
+      expect('$e', contains(r'\"indices\" values must be valid indices in the positions list.'));
+    }
+    ui.Vertices.raw( // This one does not throw.
+      ui.VertexMode.triangles,
+      Float32List.fromList(const <double>[0.0, 0.0]),
+    ).dispose();
+    ui.Vertices.raw( // This one should not throw.
+      ui.VertexMode.triangles,
+      Float32List.fromList(const <double>[0.0, 0.0, 0.0, 0.0, 0.0, 0.0]),
+      indices: Uint16List.fromList(const <int>[0, 2, 1, 2, 0, 1, 2, 0]),
+    ).dispose();
+  });
+
 }
 
 ui.Vertices _testVertices() {
@@ -266,3 +415,23 @@ const List<int> _circularVertexIndices = <int>[
   34,
   36
 ];
+
+// This function is used when asserts are NOT enabled and vertices() allows invalid
+// vertices objects to be created.  Here we attempt to use these invalid ui.Vertices
+// objects to determine if they cause problems within drawVertices()
+void useAndDisposeOfInvalidVerticesObject( ui.Vertices vertices ) {
+  expect(vertices.debugDisposed, isFalse);
+
+  final ui.PictureRecorder recorder = ui.PictureRecorder();
+  final ui.Canvas canvas = ui.Canvas(
+    recorder,
+    const ui.Rect.fromLTRB(0, 0, 100, 100)
+  );
+  canvas.drawVertices(
+    vertices,
+    ui.BlendMode.srcOver,
+    ui.Paint(),
+  );
+  vertices.dispose();
+  expect(vertices.debugDisposed, isTrue);
+}
