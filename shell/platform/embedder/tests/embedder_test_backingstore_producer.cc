@@ -145,7 +145,7 @@ bool EmbedderTestBackingStoreProducer::CreateFramebuffer(
     return false;
   }
 
-  auto userdata = new GLUserData{nullptr, surface};
+  auto userdata = new UserData(surface);
 
   backing_store_out->type = kFlutterBackingStoreTypeOpenGL;
   backing_store_out->user_data = userdata;
@@ -154,7 +154,7 @@ bool EmbedderTestBackingStoreProducer::CreateFramebuffer(
   backing_store_out->open_gl.framebuffer.name = framebuffer_info.fFBOID;
   backing_store_out->open_gl.framebuffer.user_data = userdata;
   backing_store_out->open_gl.framebuffer.destruction_callback =
-      [](void* user_data) { delete reinterpret_cast<GLUserData*>(user_data); };
+      [](void* user_data) { delete reinterpret_cast<UserData*>(user_data); };
 
   return true;
 #else
@@ -198,7 +198,7 @@ bool EmbedderTestBackingStoreProducer::CreateTexture(
     return false;
   }
 
-  auto userdata = new GLUserData{nullptr, surface};
+  auto userdata = new UserData(surface);
 
   backing_store_out->type = kFlutterBackingStoreTypeOpenGL;
   backing_store_out->user_data = userdata;
@@ -208,7 +208,7 @@ bool EmbedderTestBackingStoreProducer::CreateTexture(
   backing_store_out->open_gl.texture.format = texture_info.fFormat;
   backing_store_out->open_gl.texture.user_data = userdata;
   backing_store_out->open_gl.texture.destruction_callback =
-      [](void* user_data) { delete reinterpret_cast<GLUserData*>(user_data); };
+      [](void* user_data) { delete reinterpret_cast<UserData*>(user_data); };
 
   return true;
 #else
@@ -227,7 +227,7 @@ bool EmbedderTestBackingStoreProducer::CreateSurface(
 
   auto make_current = [](void* userdata, bool* invalidate_state) -> bool {
     *invalidate_state = false;
-    return reinterpret_cast<GLUserData*>(userdata)->gl_surface->MakeCurrent();
+    return reinterpret_cast<UserData*>(userdata)->gl_surface->MakeCurrent();
   };
 
   auto clear_current = [](void* userdata, bool* invalidate_state) -> bool {
@@ -238,15 +238,12 @@ bool EmbedderTestBackingStoreProducer::CreateSurface(
   };
 
   auto destruction_callback = [](void* userdata) {
-    delete reinterpret_cast<GLUserData*>(userdata);
+    delete reinterpret_cast<UserData*>(userdata);
   };
 
   auto sk_surface = surface->GetOnscreenSurface();
 
-  auto userdata = new GLUserData{
-      std::move(surface),
-      sk_surface,
-  };
+  auto userdata = new UserData(sk_surface, nullptr, std::move(surface));
 
   backing_store_out->type = kFlutterBackingStoreTypeOpenGL;
   backing_store_out->user_data = userdata;
@@ -281,7 +278,7 @@ bool EmbedderTestBackingStoreProducer::CreateSoftware(
     return false;
   }
 
-  auto userdata = new SWUserData{surface};
+  auto userdata = new UserData(surface);
 
   backing_store_out->type = kFlutterBackingStoreTypeSoftware;
   backing_store_out->user_data = userdata;
@@ -290,7 +287,7 @@ bool EmbedderTestBackingStoreProducer::CreateSoftware(
   backing_store_out->software.height = pixmap.height();
   backing_store_out->software.user_data = userdata;
   backing_store_out->software.destruction_callback = [](void* user_data) {
-    delete reinterpret_cast<SWUserData*>(user_data);
+    delete reinterpret_cast<UserData*>(user_data);
   };
 
   return true;
@@ -318,7 +315,7 @@ bool EmbedderTestBackingStoreProducer::CreateSoftware2(
     return false;
   }
 
-  auto userdata = new SWUserData{surface};
+  auto userdata = new UserData(surface);
 
   backing_store_out->type = kFlutterBackingStoreTypeSoftware2;
   backing_store_out->user_data = userdata;
@@ -329,7 +326,7 @@ bool EmbedderTestBackingStoreProducer::CreateSoftware2(
   backing_store_out->software2.height = pixmap.height();
   backing_store_out->software2.user_data = userdata;
   backing_store_out->software2.destruction_callback = [](void* user_data) {
-    delete reinterpret_cast<SWUserData*>(user_data);
+    delete reinterpret_cast<UserData*>(user_data);
   };
   backing_store_out->software2.pixel_format = software_pixfmt_;
 
@@ -434,21 +431,14 @@ bool EmbedderTestBackingStoreProducer::CreateVulkanImage(
 
   // Collect all allocated resources in the destruction_callback.
   {
-    UserData* user_data = new UserData();
-    user_data->image = image;
-    user_data->surface = surface.get();
-
+    auto user_data = new UserData(surface, image);
     backing_store_out->user_data = user_data;
     backing_store_out->vulkan.user_data = user_data;
     backing_store_out->vulkan.destruction_callback = [](void* user_data) {
       UserData* d = reinterpret_cast<UserData*>(user_data);
-      d->surface->unref();
       delete d->image;
       delete d;
     };
-
-    // The balancing unref is in the destruction callback.
-    surface->ref();
   }
 
   return true;
