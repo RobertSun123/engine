@@ -54,6 +54,11 @@ class ContextVK final : public Context,
     Settings(Settings&&) = default;
   };
 
+  /// Choose the number of worker threads the context_vk will create.
+  ///
+  /// Visible for testing.
+  static size_t ChooseThreadCountForWorkers(size_t hardware_concurrency);
+
   static std::shared_ptr<ContextVK> Create(Settings settings);
 
   uint64_t GetHash() const { return hash_; }
@@ -152,6 +157,8 @@ class ContextVK final : public Context,
   std::shared_ptr<GPUTracerVK> GetGPUTracer() const;
 
   void RecordFrameEndTime() const;
+
+  void InitializeCommonlyUsedShadersIfNeeded() const override;
 
  private:
   struct DeviceHolderImpl : public DeviceHolder {

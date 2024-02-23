@@ -21,7 +21,16 @@ ContentContextOptions OptionsFromPass(const RenderPass& pass) {
   ContentContextOptions opts;
   opts.sample_count = pass.GetSampleCount();
   opts.color_attachment_pixel_format = pass.GetRenderTargetPixelFormat();
-  opts.has_depth_stencil_attachments = pass.HasStencilAttachment();
+
+  bool has_depth_stencil_attachments =
+      pass.HasDepthAttachment() && pass.HasStencilAttachment();
+  FML_DCHECK(pass.HasDepthAttachment() == pass.HasStencilAttachment());
+
+  opts.has_depth_stencil_attachments = has_depth_stencil_attachments;
+  if constexpr (ContentContext::kEnableStencilThenCover) {
+    opts.depth_compare = CompareFunction::kGreater;
+    opts.stencil_mode = ContentContextOptions::StencilMode::kIgnore;
+  }
   return opts;
 }
 

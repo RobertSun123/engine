@@ -2608,6 +2608,8 @@ class TestRenderTargetAllocator : public RenderTargetAllocator {
 
   std::vector<TextureDescriptor> GetDescriptors() const { return allocated_; }
 
+  void ResetDescriptors() { allocated_.clear(); }
+
  private:
   std::vector<TextureDescriptor> allocated_;
 };
@@ -2645,6 +2647,7 @@ TEST_P(EntityTest, AdvancedBlendCoverageHintIsNotResetByEntityPass) {
   auto content_context = ContentContext(
       GetContext(), TypographerContextSkia::Make(), test_allocator);
   pass->AddEntity(std::move(entity));
+  test_allocator->ResetDescriptors();
 
   EXPECT_TRUE(pass->Render(content_context, rt));
 
@@ -2656,18 +2659,22 @@ TEST_P(EntityTest, AdvancedBlendCoverageHintIsNotResetByEntityPass) {
 
     EXPECT_EQ(test_allocator->GetDescriptors()[4].size, ISize(200, 200));
     EXPECT_EQ(test_allocator->GetDescriptors()[5].size, ISize(200, 200));
-  } else if (test_allocator->GetDescriptors().size() == 9u) {
+  } else if (test_allocator->GetDescriptors().size() == 7u) {
     // Onscreen render target.
     EXPECT_EQ(test_allocator->GetDescriptors()[0].size, ISize(1000, 1000));
     EXPECT_EQ(test_allocator->GetDescriptors()[1].size, ISize(1000, 1000));
     EXPECT_EQ(test_allocator->GetDescriptors()[2].size, ISize(1000, 1000));
-    EXPECT_EQ(test_allocator->GetDescriptors()[3].size, ISize(1000, 1000));
-    EXPECT_EQ(test_allocator->GetDescriptors()[4].size, ISize(1000, 1000));
 
-    EXPECT_EQ(test_allocator->GetDescriptors()[5].size, ISize(200, 200));
+    EXPECT_EQ(test_allocator->GetDescriptors()[3].size, ISize(200, 200));
+    EXPECT_EQ(test_allocator->GetDescriptors()[4].size, ISize(200, 200));
     EXPECT_EQ(test_allocator->GetDescriptors()[5].size, ISize(200, 200));
     EXPECT_EQ(test_allocator->GetDescriptors()[6].size, ISize(200, 200));
-    EXPECT_EQ(test_allocator->GetDescriptors()[7].size, ISize(200, 200));
+  } else if (test_allocator->GetDescriptors().size() == 4u) {
+    EXPECT_EQ(test_allocator->GetDescriptors()[0].size, ISize(1000, 1000));
+    EXPECT_EQ(test_allocator->GetDescriptors()[1].size, ISize(1000, 1000));
+
+    EXPECT_EQ(test_allocator->GetDescriptors()[2].size, ISize(200, 200));
+    EXPECT_EQ(test_allocator->GetDescriptors()[3].size, ISize(200, 200));
   } else {
     EXPECT_TRUE(false);
   }
@@ -2750,6 +2757,40 @@ TEST_P(EntityTest, FramebufferFetchVulkanBindingOffsetIsTheSame) {
   EXPECT_TRUE(expected_layout);
 }
 #endif
+
+TEST_P(EntityTest, FillPathGeometryGetPositionBufferReturnsExpectedMode) {
+  RenderTarget target;
+  testing::MockRenderPass mock_pass(GetContext(), target);
+
+  auto get_result = [this, &mock_pass](const Path& path) {
+    auto geometry = Geometry::MakeFillPath(
+        path, /* inner rect */ Rect::MakeLTRB(0, 0, 100, 100));
+    return geometry->GetPositionBuffer(*GetContentContext(), {}, mock_pass);
+  };
+
+  // Convex path
+  {
+    GeometryResult result =
+        get_result(PathBuilder{}
+                       .AddRect(Rect::MakeLTRB(0, 0, 100, 100))
+                       .SetConvexity(Convexity::kConvex)
+                       .TakePath());
+    EXPECT_EQ(result.mode, GeometryResult::Mode::kNormal);
+  }
+
+  // Concave path
+  {
+    Path path = PathBuilder{}
+                    .MoveTo({0, 0})
+                    .LineTo({100, 0})
+                    .LineTo({100, 100})
+                    .LineTo({50, 50})
+                    .Close()
+                    .TakePath();
+    GeometryResult result = get_result(path);
+    EXPECT_EQ(result.mode, GeometryResult::Mode::kNormal);
+  }
+}
 
 }  // namespace testing
 }  // namespace impeller

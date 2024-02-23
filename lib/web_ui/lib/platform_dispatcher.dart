@@ -90,7 +90,7 @@ abstract class PlatformDispatcher {
 
   void scheduleFrame();
 
-  Future<void> render(Scene scene, [FlutterView view]);
+  void scheduleWarmUpFrame({required VoidCallback beginFrame, required VoidCallback drawFrame});
 
   AccessibilityFeatures get accessibilityFeatures;
 
