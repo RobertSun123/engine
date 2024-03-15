@@ -19,6 +19,8 @@ class NdkHelpersTest : public ::testing::Test {
   static void OnVsync32(
       long frame_nanos,  // NOLINT - compat for deprecated call
       void* data) {}
+  static void OnVsync33(const AChoreographerFrameCallbackData* callback_data,
+                        void* data) {}
 };
 
 TEST_F(NdkHelpersTest, ATrace) {
@@ -59,8 +61,9 @@ TEST_F(NdkHelpersTest, AChoreographer32NotSupported) {
 #endif  // FML_ARCH_CPU_64_BITS
 
 TEST_F(NdkHelpersTest, AChoreographer64) {
-  if (android_get_device_api_level() < 29) {
-    GTEST_SKIP() << "This test is for API 29 and above.";
+  if (android_get_device_api_level() < 29 ||
+      android_get_device_api_level() > 32) {
+    GTEST_SKIP() << "This test is for API 29-32 only.";
   }
 
   EXPECT_EQ(NDKHelpers::ChoreographerSupported(),
@@ -74,6 +77,24 @@ TEST_F(NdkHelpersTest, AChoreographer64) {
 
   NDKHelpers::AChoreographer_postFrameCallback64(
       NDKHelpers::AChoreographer_getInstance(), &OnVsync, nullptr);
+}
+
+TEST_F(NdkHelpersTest, AChoreographerVsync) {
+  if (android_get_device_api_level() < 33) {
+    GTEST_SKIP() << "This test is for API 33 and above.";
+  }
+
+  EXPECT_EQ(NDKHelpers::ChoreographerSupported(),
+            ChoreographerSupportStatus::kSupportedVsync);
+
+  EXPECT_FALSE(NDKHelpers::AChoreographer_getInstance());
+
+  fml::MessageLoop::EnsureInitializedForCurrentThread();
+
+  EXPECT_TRUE(NDKHelpers::AChoreographer_getInstance());
+
+  NDKHelpers::AChoreographer_postVsyncCallback(
+      NDKHelpers::AChoreographer_getInstance(), &OnVsync33, nullptr);
 }
 
 TEST_F(NdkHelpersTest, HardwareBuffer) {
