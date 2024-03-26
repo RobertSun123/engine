@@ -1210,7 +1210,7 @@ hooks = [
   {
     'name': 'Download Fuchsia system images',
     'pattern': '.',
-    'condition': 'run_fuchsia_emu',
+    'condition': 'download_fuchsia_deps and run_fuchsia_emu',
     'action': [
       'env',
       'DOWNLOAD_FUCHSIA_SDK={download_fuchsia_sdk}',
