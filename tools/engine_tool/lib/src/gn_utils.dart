@@ -32,8 +32,13 @@ enum BuildTargetType {
   staticLibrary,
 }
 
-BuildTargetType? _buildTargetTypeFromString(String type) {
+BuildTargetType? _buildTargetTypeFromString(String type, Map<String, Object?>? metadata) {
   switch (type) {
+    case 'action':
+      if (_getActionType(metadata) == 'dart_executable') {
+        return BuildTargetType.executable;
+      }
+      return null;
     case 'executable':
       return BuildTargetType.executable;
     case 'shared_library':
@@ -44,6 +49,16 @@ BuildTargetType? _buildTargetTypeFromString(String type) {
       // We ignore a number of types here.
       return null;
   }
+}
+
+String? _getActionType(Map<String, Object?>? metadata) {
+  if (metadata != null) {
+    final List<String>? action_type = getListOfString(metadata, 'action_type');
+    if (action_type != null && action_type.isNotEmpty) {
+      return action_type[0];
+    }
+  }
+  return null;
 }
 
 // TODO(johnmccutchan): What should we do about source_sets and other
@@ -77,30 +92,9 @@ final class BuildTarget {
 Future<Map<String, BuildTarget>> findTargets(
     Environment environment, Directory buildDir) async {
   final Map<String, BuildTarget> r = <String, BuildTarget>{};
-  final List<String> getBuildInfoCommandLine = <String>[
-    gnBinPath(environment),
-    'desc',
-    buildDir.path,
-    '*',
-    '--format=json',
-  ];
 
-  final ProcessRunnerResult result = await environment.processRunner.runProcess(
-      getBuildInfoCommandLine,
-      workingDirectory: environment.engine.srcDir,
-      failOk: true);
-
-  // Handle any process failures.
-  fatalIfFailed(environment, getBuildInfoCommandLine, result);
-
-  late final Map<String, Object?> jsonResult;
-  try {
-    jsonResult = jsonDecode(result.stdout) as Map<String, Object?>;
-  } catch (e) {
-    environment.logger.fatal(
-        'gn desc output could not be parsed:\nE=$e\nIN=${result.stdout}\n');
-  }
-
+  final Map<String, Object?> jsonResult =
+      await _runGnDesc(buildDir.path, '*', environment);
   for (final MapEntry<String, Object?> targetEntry in jsonResult.entries) {
     final String label = targetEntry.key;
     if (targetEntry.value == null) {
@@ -113,14 +107,15 @@ Future<Map<String, BuildTarget>> findTargets(
     if (typeString == null) {
       environment.logger.fatal('gn desc is missing target type: $properties');
     }
-    final BuildTargetType? type = _buildTargetTypeFromString(typeString!);
+    final Map<String, Object?>? metadata = getMap(properties, 'metadata');
+    final BuildTargetType? type = _buildTargetTypeFromString(typeString!, metadata);
     if (type == null) {
       // Target is a type that we don't support.
       continue;
     }
     final bool testOnly = getBool(properties, 'testonly');
     final List<String> outputs =
-        getListOfString(properties, 'outputs') ?? <String>[];
+        await _runGnOutputs(buildDir.path, label, environment);
     File? executable;
     if (type == BuildTargetType.executable) {
       if (outputs.isEmpty) {
@@ -133,6 +128,55 @@ Future<Map<String, BuildTarget>> findTargets(
     r[label] = target;
   }
   return r;
+}
+
+/// Returns the JSON output of running `gn desc buildDir label`.
+Future<Map<String, Object?>> _runGnDesc(
+    String buildDir, String label, Environment environment) async {
+  final List<String> commandline = <String>[
+    gnBinPath(environment),
+    'desc',
+    buildDir,
+    label,
+    '--format=json',
+  ];
+
+  final ProcessRunnerResult result = await environment.processRunner.runProcess(
+      commandline,
+      workingDirectory: environment.engine.srcDir,
+      failOk: true);
+
+  // Handle any process failures.
+  fatalIfFailed(environment, commandline, result);
+
+  late final Map<String, Object?> jsonResult;
+  try {
+    jsonResult = jsonDecode(result.stdout) as Map<String, Object?>;
+  } catch (e) {
+    environment.logger.fatal(
+        'gn desc output could not be parsed:\nE=$e\nIN=${result.stdout}\n');
+  }
+  return jsonResult;
+}
+
+/// Returns the output paths returned by `gn outputs buildDir label`.
+Future<List<String>> _runGnOutputs(
+    String buildDir, String label, Environment environment) async {
+  final List<String> commandline = <String>[
+    gnBinPath(environment),
+    'outputs',
+    buildDir,
+    label,
+  ];
+  final ProcessRunnerResult result = await environment.processRunner.runProcess(
+      commandline,
+      workingDirectory: environment.engine.srcDir,
+      failOk: true);
+
+  // Handle any process failures.
+  fatalIfFailed(environment, commandline, result);
+
+  return result.stdout.split('\n');
 }
 
 /// Process selectors and filter allTargets for matches.
