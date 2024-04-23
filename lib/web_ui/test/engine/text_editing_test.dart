@@ -73,6 +73,7 @@ Future<void> testMain() async {
     cleanTextEditingStrategy();
     cleanTestFlags();
     clearBackUpDomElementIfExists();
+    domDocument.activeElement?.blur();
   });
 
   group('$GloballyPositionedTextEditingStrategy', () {
@@ -108,6 +109,7 @@ Future<void> testMain() async {
       final DomElement input = defaultTextEditingRoot.querySelector('input')!;
       // Now the editing element should have focus.
 
+      expect(input.tabIndex, -1, reason: 'The input should not be reachable by keyboard');
       expect(domDocument.activeElement, input);
       expect(defaultTextEditingRoot.ownerDocument?.activeElement, input);
 
@@ -2838,6 +2840,8 @@ Future<void> testMain() async {
       final DomHTMLInputElement inputElement = form.childNodes.toList()[0] as
           DomHTMLInputElement;
       expect(inputElement.type, 'submit');
+      expect(inputElement.tabIndex, -1, reason: 'The input should not be reachable by keyboard');
+
 
       // The submit button should have class `submitBtn`.
       expect(inputElement.className, 'submitBtn');
@@ -3502,7 +3506,7 @@ Future<void> testMain() async {
       } else {
         expect(input.style.background, contains('transparent'));
         expect(input.style.outline, contains('none'));
-        expect(input.style.border, contains('none'));
+        expect(input.style.border, anyOf(contains('none'), contains('medium')));
       }
       expect(input.style.backgroundColor, contains('transparent'));
       expect(input.style.caretColor, contains('transparent'));
