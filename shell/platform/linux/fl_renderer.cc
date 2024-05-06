@@ -12,11 +12,15 @@
 #include "flutter/shell/platform/linux/fl_engine_private.h"
 #include "flutter/shell/platform/linux/fl_view_private.h"
 
+constexpr int kPositionLocation = 0;
+constexpr int kTexCoordLocation = 1;
+
 // Vertex shader to draw Flutter window contents.
 static const char* vertex_shader_src =
-    "attribute vec2 position;\n"
-    "attribute vec2 in_texcoord;\n"
-    "varying vec2 texcoord;\n"
+    "#version 320 es\n"
+    "layout(location = 0) in vec2 position;\n"
+    "layout(location = 1) in vec2 in_texcoord;\n"
+    "out vec2 texcoord;\n"
     "\n"
     "void main() {\n"
     "  gl_Position = vec4(position, 0, 1);\n"
@@ -25,11 +29,14 @@ static const char* vertex_shader_src =
 
 // Fragment shader to draw Flutter window contents.
 static const char* fragment_shader_src =
+    "#version 320 es\n"
+    "precision mediump float;\n"
     "uniform sampler2D texture;\n"
-    "varying vec2 texcoord;\n"
+    "in vec2 texcoord;\n"
+    "layout(location = 0) out vec4 diffuseColor;\n"
     "\n"
     "void main() {\n"
-    "  gl_FragColor = texture2D(texture, texcoord);\n"
+    "  diffuseColor = texture2D(texture, texcoord);\n"
     "}\n";
 
 G_DEFINE_QUARK(fl_renderer_error_quark, fl_renderer_error)
@@ -358,13 +365,11 @@ void fl_renderer_render(FlRenderer* self, int width, int height) {
     glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertex_data), vertex_data,
                  GL_STATIC_DRAW);
-    GLint position_index = glGetAttribLocation(priv->program, "position");
-    glEnableVertexAttribArray(position_index);
-    glVertexAttribPointer(position_index, 2, GL_FLOAT, GL_FALSE,
+    glEnableVertexAttribArray(kPositionLocation);
+    glVertexAttribPointer(kPositionLocation, 2, GL_FLOAT, GL_FALSE,
                           sizeof(GLfloat) * 4, 0);
-    GLint texcoord_index = glGetAttribLocation(priv->program, "in_texcoord");
-    glEnableVertexAttribArray(texcoord_index);
-    glVertexAttribPointer(texcoord_index, 2, GL_FLOAT, GL_FALSE,
+    glEnableVertexAttribArray(kTexCoordLocation);
+    glVertexAttribPointer(kTexCoordLocation, 2, GL_FLOAT, GL_FALSE,
                           sizeof(GLfloat) * 4, (void*)(sizeof(GLfloat) * 2));
 
     glDrawArrays(GL_TRIANGLES, 0, 6);
