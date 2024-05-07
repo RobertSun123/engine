@@ -134,7 +134,9 @@ static NSString* const kRestorationStateAppModificationKey = @"mod-date";
   }
 }
 
-- (BOOL)openURL:(NSURL*)url {
+- (BOOL)openURL:(NSURL*)url 
+    options:(NSDictionary<UIApplicationOpenURLOptionsKey, id>*)options 
+    completionHandler:(void (^)(BOOL))completionHandler {
   NSNumber* isDeepLinkingEnabled =
       [[NSBundle mainBundle] objectForInfoDictionaryKey:@"FlutterDeepLinkingEnabled"];
   if (!isDeepLinkingEnabled.boolValue) {
@@ -149,15 +151,25 @@ static NSString* const kRestorationStateAppModificationKey = @"mod-date";
                      if (didTimeout) {
                        FML_LOG(ERROR)
                            << "Timeout waiting for the first frame when launching an URL.";
+                       return NO;
                      } else {
-                       [flutterViewController.engine.navigationChannel
-                           invokeMethod:@"pushRouteInformation"
-                              arguments:@{
-                                @"location" : url.absoluteString ?: [NSNull null],
-                              }];
+                      // invove the method and get the result
+                      [flutterViewController.engine.navigationChannel
+                          invokeMethod:@"getRouteInformation"
+                             arguments:@{
+                               @"location" : url.absoluteString ?: [NSNull null],
+                             }
+                             result:^(id _Nullable result) {
+                                BOOL success = [result isKindOfClass:[NSNumber class]] && [result boolValue];
+                                if (success) {
+                                  return YES;
+                                } else {
+                                  FML_LOG(ERROR) << "Failed to handle route information in Flutter.";
+                                  return NO;
+                                }
+                             }];
                      }
                    }];
-      return YES;
     } else {
       FML_LOG(ERROR) << "Attempting to open an URL without a Flutter RootViewController.";
       return NO;
