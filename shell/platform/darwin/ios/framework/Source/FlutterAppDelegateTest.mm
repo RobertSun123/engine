@@ -62,14 +62,31 @@ FLUTTER_ASSERT_ARC
   OCMStub([self.mockMainBundle objectForInfoDictionaryKey:@"FlutterDeepLinkingEnabled"])
       .andReturn(@YES);
 
+  OCMStub([self.mockNavigationChannel invokeMethod:@"pushRouteInformation"
+                                       arguments:@{@"location" : @"http://myApp/custom/route?query=test"}]).andReturn(@YES);
+
   BOOL result =
       [self.appDelegate application:[UIApplication sharedApplication]
                             openURL:[NSURL URLWithString:@"http://myApp/custom/route?query=test"]
                             options:@{}];
+
   XCTAssertTrue(result);
-  OCMVerify([self.mockNavigationChannel
-      invokeMethod:@"pushRouteInformation"
-         arguments:@{@"location" : @"http://myApp/custom/route?query=test"}]);
+  OCMVerifyAll(self.mockNavigationChannel);
+}
+
+- (void)testLaunchUrlWithNavigationChannelReturningFalse {
+  OCMStub([self.mockMainBundle objectForInfoDictionaryKey:@"FlutterDeepLinkingEnabled"])
+      .andReturn(@YES);
+
+  OCMStub([self.mockNavigationChannel invokeMethod:@"pushRouteInformation"
+                                       arguments:@{@"location" : @"http://myApp/custom/route?query=test"}]).andReturn(@NO);
+
+  BOOL result =
+      [self.appDelegate application:[UIApplication sharedApplication]
+                            openURL:[NSURL URLWithString:@"http://myApp/custom/route?query=test"]
+                            options:@{}];
+  XCTAssertFalse(result);
+  OCMVerifyAll(self.mockNavigationChannel);
 }
 
 - (void)testLaunchUrlWithDeepLinkingNotSet {
