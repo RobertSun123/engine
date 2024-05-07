@@ -149,7 +149,6 @@ static NSString* const kRestorationStateAppModificationKey = @"mod-date";
                      if (didTimeout) {
                        FML_LOG(ERROR)
                            << "Timeout waiting for the first frame when launching an URL.";
-                       return NO;
                      } else {
                       // invove the method and get the result
                       [flutterViewController.engine.navigationChannel
