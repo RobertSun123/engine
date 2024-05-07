@@ -159,15 +159,14 @@ static NSString* const kRestorationStateAppModificationKey = @"mod-date";
                              }
                              result:^(id _Nullable result) {
                                 BOOL success = [result isKindOfClass:[NSNumber class]] && [result boolValue];
-                                if (success) {
-                                  return YES;
-                                } else {
-                                  FML_LOG(ERROR) << "Failed to handle route information in Flutter.";
-                                  return NO;
+                                if (!success) {
+                                    // Logging the error if the result is not successful
+                                    FML_LOG(ERROR) << "Failed to handle route information in Flutter.";
                                 }
                              }];
                      }
                    }];
+      return YES;
     } else {
       FML_LOG(ERROR) << "Attempting to open an URL without a Flutter RootViewController.";
       return NO;
