@@ -528,6 +528,13 @@ static void SetThreadPriority(FlutterThreadPriority priority) {
 
   _platformViewController = [[FlutterPlatformViewController alloc] init];
   _threadSynchronizer = [[FlutterThreadSynchronizer alloc] init];
+  // The macOS compositor must be initialized in the initializer because it is
+  // used when adding views, which might happen before runWithEntrypoint.
+  _macOSCompositor = std::make_unique<flutter::FlutterCompositor>(
+      [[FlutterViewEngineProvider alloc] initWithEngine:self],
+      [[FlutterTimeConverter alloc] initWithEngine:self], _platformViewController,
+      dispatch_get_main_queue());
+
   [self setUpPlatformViewChannel];
   [self setUpAccessibilityChannel];
   [self setUpNotificationCenterListeners];
@@ -731,6 +738,7 @@ static void SetThreadPriority(FlutterThreadPriority priority) {
 
 - (void)registerViewController:(FlutterViewController*)controller
                  forIdentifier:(FlutterViewIdentifier)viewIdentifier {
+  _macOSCompositor->AddView(viewIdentifier);
   NSAssert(controller != nil, @"The controller must not be nil.");
   NSAssert(controller.engine == nil,
            @"The FlutterViewController is unexpectedly attached to "
@@ -785,6 +793,7 @@ static void SetThreadPriority(FlutterThreadPriority priority) {
 }
 
 - (void)deregisterViewControllerForIdentifier:(FlutterViewIdentifier)viewIdentifier {
+  _macOSCompositor->RemoveView(viewIdentifier);
   FlutterViewController* controller = [self viewControllerForIdentifier:viewIdentifier];
   // The controller can be nil. The engine stores only a weak ref, and this
   // method could have been called from the controller's dealloc.
@@ -852,10 +861,6 @@ static void SetThreadPriority(FlutterThreadPriority priority) {
 }
 
 - (FlutterCompositor*)createFlutterCompositor {
-  _macOSCompositor = std::make_unique<flutter::FlutterCompositor>(
-      [[FlutterViewEngineProvider alloc] initWithEngine:self],
-      [[FlutterTimeConverter alloc] initWithEngine:self], _platformViewController);
-
   _compositor = {};
   _compositor.struct_size = sizeof(FlutterCompositor);
   _compositor.user_data = _macOSCompositor.get();
