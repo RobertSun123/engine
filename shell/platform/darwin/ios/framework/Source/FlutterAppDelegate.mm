@@ -134,12 +134,15 @@ static NSString* const kRestorationStateAppModificationKey = @"mod-date";
   }
 }
 
-- (BOOL)openURL:(NSURL*)url {
+
+- (void)openURL:(NSURL *)url 
+        options:(NSDictionary<UIApplicationOpenExternalURLOptionsKey, id> *)options 
+        completionHandler:(void (^)(BOOL success))completion{
   NSNumber* isDeepLinkingEnabled =
       [[NSBundle mainBundle] objectForInfoDictionaryKey:@"FlutterDeepLinkingEnabled"];
   if (!isDeepLinkingEnabled.boolValue) {
     // Not set or NO.
-    return NO;
+    completion(NO);
   } else {
     FlutterViewController* flutterViewController = [self rootFlutterViewController];
     if (flutterViewController) {
@@ -149,6 +152,7 @@ static NSString* const kRestorationStateAppModificationKey = @"mod-date";
                      if (didTimeout) {
                        FML_LOG(ERROR)
                            << "Timeout waiting for the first frame when launching an URL.";
+                        completion(NO);
                      } else {
                       // invove the method and get the result
                       [flutterViewController.engine.navigationChannel
@@ -162,13 +166,13 @@ static NSString* const kRestorationStateAppModificationKey = @"mod-date";
                                     // Logging the error if the result is not successful
                                     FML_LOG(ERROR) << "Failed to handle route information in Flutter.";
                                 }
+                                completion(success);
                              }];
                      }
                    }];
-      return YES;
     } else {
       FML_LOG(ERROR) << "Attempting to open an URL without a Flutter RootViewController.";
-      return NO;
+      completion(NO);
     }
   }
 }
@@ -179,7 +183,7 @@ static NSString* const kRestorationStateAppModificationKey = @"mod-date";
   if ([_lifeCycleDelegate application:application openURL:url options:options]) {
     return YES;
   }
-  return [self openURL:url];
+  return [self openURL:url options:options completionHandler:^(BOOL success) {}];
 }
 
 - (BOOL)application:(UIApplication*)application handleOpenURL:(NSURL*)url {
@@ -222,7 +226,7 @@ static NSString* const kRestorationStateAppModificationKey = @"mod-date";
                    restorationHandler:restorationHandler]) {
     return YES;
   }
-  return [self openURL:userActivity.webpageURL];
+  return [self openURL:userActivity.webpageURL options:@{} completionHandler:^(BOOL success) {}];
 }
 
 #pragma mark - FlutterPluginRegistry methods. All delegating to the rootViewController
