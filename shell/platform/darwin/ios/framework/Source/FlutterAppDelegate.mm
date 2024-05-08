@@ -155,7 +155,7 @@ static NSString* const kRestorationStateAppModificationKey = @"mod-date";
                      } else {
                       // invove the method and get the result
                       [flutterViewController.engine.navigationChannel
-                          invokeMethod:@"getRouteInformation"
+                          invokeMethod:@"pushRouteInformation"
                              arguments:@{
                                @"location" : url.absoluteString ?: [NSNull null],
                              }
