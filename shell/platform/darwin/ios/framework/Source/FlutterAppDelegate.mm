@@ -182,7 +182,11 @@ static NSString* const kRestorationStateAppModificationKey = @"mod-date";
   if ([_lifeCycleDelegate application:application openURL:url options:options]) {
     return YES;
   }
-  return [self openURL:url options:options completionHandler:^(BOOL success) {}];
+  __block BOOL urlHandled = NO;
+  [self openURL:url options:options completionHandler:^(BOOL success) {
+    urlHandled = success;
+  }];
+  return urlHandled;
 }
 
 - (BOOL)application:(UIApplication*)application handleOpenURL:(NSURL*)url {
@@ -225,7 +229,11 @@ static NSString* const kRestorationStateAppModificationKey = @"mod-date";
                    restorationHandler:restorationHandler]) {
     return YES;
   }
-  return [self openURL:userActivity.webpageURL options:@{} completionHandler:^(BOOL success) {}];
+  __block BOOL urlHandled = NO;
+  [self openURL:userActivity.webpageURL options:@{} completionHandler:^(BOOL success) {
+    urlHandled = success;
+  }];
+  return urlHandled;
 }
 
 #pragma mark - FlutterPluginRegistry methods. All delegating to the rootViewController
