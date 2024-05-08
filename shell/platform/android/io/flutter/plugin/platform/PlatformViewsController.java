@@ -4,14 +4,13 @@
 
 package io.flutter.plugin.platform;
 
-import static android.view.MotionEvent.PointerCoords;
-import static android.view.MotionEvent.PointerProperties;
 import static io.flutter.Build.API_LEVELS;
 
 import android.annotation.TargetApi;
 import android.content.ComponentCallbacks2;
 import android.content.Context;
 import android.content.MutableContextWrapper;
+import android.hardware.input.InputManager;
 import android.os.Build;
 import android.util.SparseArray;
 import android.view.MotionEvent;
@@ -25,6 +24,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.UiThread;
 import androidx.annotation.VisibleForTesting;
+import io.flutter.BuildConfig;
 import io.flutter.Log;
 import io.flutter.embedding.android.AndroidTouchProcessor;
 import io.flutter.embedding.android.FlutterView;
@@ -52,6 +52,10 @@ import java.util.List;
  */
 public class PlatformViewsController implements PlatformViewsAccessibilityDelegate {
   private static final String TAG = "PlatformViewsController";
+
+  // This input manager is only used for confirming the verification status of motion events in
+  // debug builds.
+  private InputManager inputManager;
 
   // These view types allow out-of-band drawing commands that don't notify the Android view
   // hierarchy.
@@ -668,6 +672,25 @@ public class PlatformViewsController implements PlatformViewsAccessibilityDelega
     return textureId;
   }
 
+  /**
+   * Translates an original touch event to have the same locations as the ones that Flutter
+   * calculates (because original + flutter's - original = flutter's).
+   *
+   * @param originalEvent The saved original input event.
+   * @param pointerCoords The coordinates that Flutter thinks the touch is happening at.
+   */
+  private void translateNonVirtualDisplayMotionEvent(
+      MotionEvent originalEvent, PointerCoords[] pointerCoords) {
+    if (pointerCoords.length < 1) {
+      return;
+    }
+
+    float xOffset = pointerCoords[0].x - originalEvent.getX();
+    float yOffset = pointerCoords[0].y - originalEvent.getY();
+
+    originalEvent.offsetLocation(xOffset, yOffset);
+  }
+
   @VisibleForTesting
   public MotionEvent toMotionEvent(
       float density, PlatformViewsChannel.PlatformViewTouch touch, boolean usingVirtualDiplay) {
@@ -675,25 +698,38 @@ public class PlatformViewsController implements PlatformViewsAccessibilityDelega
         MotionEventTracker.MotionEventId.from(touch.motionEventId);
     MotionEvent trackedEvent = motionEventTracker.pop(motionEventId);
 
+    // Pointer coordinates in the tracked events are global to FlutterView
+    // The framework converts them to be local to a widget, given that
+    // motion events operate on local coords, we need to replace these in the tracked
+    // event with their local counterparts.
+    // Compute this early so it can be used as input to translateNonVirtualDisplayMotionEvent.
+    PointerCoords[] pointerCoords =
+        parsePointerCoordsList(touch.rawPointerCoords, density)
+            .toArray(new PointerCoords[touch.pointerCount]);
+
     if (!usingVirtualDiplay && trackedEvent != null) {
-      // We have the original event, deliver it as it will pass the verifiable
+      // We have the original event, deliver it after offsetting as it will pass the verifiable
       // input check.
+      translateNonVirtualDisplayMotionEvent(trackedEvent, pointerCoords);
+      if (BuildConfig.DEBUG && Build.VERSION.SDK_INT >= API_LEVELS.API_30) {
+        if (inputManager != null && inputManager.verifyInputEvent(trackedEvent) == null) {
+          // The translation we do uses MotionEvent.offsetLocation, which shouldn't affect
+          // verification status. This case is to warn in debug builds if this behavior changes,
+          // so that it doesn't go unnoticed.
+          throw new Error(
+              "Motion event that was translated in PlatformViewsController.toPlatformView "
+                  + "does not have verified status. Investigate if this was caused by the translation, "
+                  + "or if there is a case in which it isn't verified that we should ignore.");
+        }
+      }
       return trackedEvent;
     }
     // We are in virtual display mode or don't have a reference to the original MotionEvent.
     // In this case we manually recreate a MotionEvent to be delivered. This MotionEvent
     // will fail the verifiable input check.
-
-    // Pointer coordinates in the tracked events are global to FlutterView
-    // framework converts them to be local to a widget, given that
-    // motion events operate on local coords, we need to replace these in the tracked
-    // event with their local counterparts.
     PointerProperties[] pointerProperties =
         parsePointerPropertiesList(touch.rawPointerPropertiesList)
             .toArray(new PointerProperties[touch.pointerCount]);
-    PointerCoords[] pointerCoords =
-        parsePointerCoordsList(touch.rawPointerCoords, density)
-            .toArray(new PointerCoords[touch.pointerCount]);
 
     // TODO (kaushikiska) : warn that we are potentially using an untracked
     // event in the platform views.
@@ -751,6 +787,9 @@ public class PlatformViewsController implements PlatformViewsAccessibilityDelega
     this.textureRegistry = textureRegistry;
     platformViewsChannel = new PlatformViewsChannel(dartExecutor);
     platformViewsChannel.setPlatformViewsHandler(channelHandler);
+    if (context != null) {
+      inputManager = (InputManager) context.getSystemService(Context.INPUT_SERVICE);
+    }
   }
 
   /**
