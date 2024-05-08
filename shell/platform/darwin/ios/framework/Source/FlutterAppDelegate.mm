@@ -134,9 +134,8 @@ static NSString* const kRestorationStateAppModificationKey = @"mod-date";
   }
 }
 
-
-- (void)openURL:(NSURL *)url 
-        options:(NSDictionary<UIApplicationOpenExternalURLOptionsKey, id> *)options 
+- (void)openURL:(NSURL *)url
+        options:(NSDictionary<UIApplicationOpenExternalURLOptionsKey, id> *)options
         completionHandler:(void (^)(BOOL success))completion{
   NSNumber* isDeepLinkingEnabled =
       [[NSBundle mainBundle] objectForInfoDictionaryKey:@"FlutterDeepLinkingEnabled"];
