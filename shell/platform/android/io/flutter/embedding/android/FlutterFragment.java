@@ -1056,6 +1056,11 @@ public class FlutterFragment extends Fragment
     delegate.onAttach(context);
     if (getArguments().getBoolean(ARG_SHOULD_AUTOMATICALLY_HANDLE_ON_BACK_PRESSED, false)) {
       requireActivity().getOnBackPressedDispatcher().addCallback(this, onBackPressedCallback);
+      // By default, Android handles backs, and predictive back is enabled. This
+      // can be changed by calling setFrameworkHandlesBack. For example, the
+      // framework will call this automatically in a typical app when it has
+      // routes to pop.
+      onBackPressedCallback.setEnabled(false);
     }
     context.registerComponentCallbacks(this);
   }
@@ -1663,14 +1668,27 @@ public class FlutterFragment extends Fragment
         // Unless we disable the callback, the dispatcher call will trigger it. This will then
         // trigger the fragment's onBackPressed() implementation, which will call through to the
         // dart side and likely call back through to this method, creating an infinite call loop.
-        onBackPressedCallback.setEnabled(false);
+        boolean enabledAtStart = onBackPressedCallback.isEnabled();
+        if (enabledAtStart) {
+          onBackPressedCallback.setEnabled(false);
+        }
         activity.getOnBackPressedDispatcher().onBackPressed();
-        onBackPressedCallback.setEnabled(true);
+        if (enabledAtStart) {
+          onBackPressedCallback.setEnabled(true);
+        }
         return true;
       }
     }
     // Hook for subclass. No-op if returns false.
     return false;
+  }
+
+  @Override
+  public void setFrameworkHandlesBack(boolean frameworkHandlesBack) {
+    if (getArguments().getBoolean(ARG_SHOULD_AUTOMATICALLY_HANDLE_ON_BACK_PRESSED, false)) {
+      return;
+    }
+    onBackPressedCallback.setEnabled(frameworkHandlesBack);
   }
 
   @VisibleForTesting

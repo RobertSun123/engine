@@ -290,7 +290,7 @@ public class FlutterFragmentTest {
   }
 
   @Test
-  public void itDelegatesOnBackPressedAutomaticallyWhenEnabled() {
+  public void itDelegatesOnBackPressedWithSetFrameworkHandlesBack() {
     // We need to mock FlutterJNI to avoid triggering native code.
     FlutterJNI flutterJNI = mock(FlutterJNI.class);
     when(flutterJNI.isAttached()).thenReturn(true);
@@ -318,6 +318,11 @@ public class FlutterFragmentTest {
     TestDelegateFactory delegateFactory = new TestDelegateFactory(mockDelegate);
     fragment.setDelegateFactory(delegateFactory);
 
+    activity.onBackPressed();
+
+    verify(mockDelegate, times(0)).onBackPressed();
+
+    fragment.setFrameworkHandlesBack(true);
     activity.onBackPressed();
 
     verify(mockDelegate, times(1)).onBackPressed();
@@ -361,10 +366,20 @@ public class FlutterFragmentTest {
     TestDelegateFactory delegateFactory = new TestDelegateFactory(mockDelegate);
     fragment.setDelegateFactory(delegateFactory);
 
+    assertTrue(callback.isEnabled());
+
     assertTrue(fragment.popSystemNavigator());
 
     verify(mockDelegate, never()).onBackPressed();
     assertTrue(onBackPressedCalled.get());
+    assertTrue(callback.isEnabled());
+
+    callback.setEnabled(false);
+    assertFalse(callback.isEnabled());
+    assertTrue(fragment.popSystemNavigator());
+
+    verify(mockDelegate, never()).onBackPressed();
+    assertFalse(callback.isEnabled());
   }
 
   @Test
