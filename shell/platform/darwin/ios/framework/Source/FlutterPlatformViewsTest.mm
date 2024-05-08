@@ -595,6 +595,7 @@ fml::RefPtr<fml::TaskRunner> CreateNewThread(const std::string& name) {
     XCTAssertEqual(originalView, newView);
     id mockOrignalView = OCMPartialMock(originalView);
     OCMReject([mockOrignalView removeFromSuperview]);
+    [mockOrignalView stopMocking];
   }
 }
 
