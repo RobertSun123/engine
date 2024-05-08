@@ -137,10 +137,11 @@ static NSString* const kRestorationStateAppModificationKey = @"mod-date";
 - (BOOL)openURL:(NSURL*)url {
   NSNumber* isDeepLinkingEnabled =
       [[NSBundle mainBundle] objectForInfoDictionaryKey:@"FlutterDeepLinkingEnabled"];
-  if (!isDeepLinkingEnabled.boolValue) {
-    // Not set or NO.
+  if ([isDeepLinkingEnabled isEqual:@NO]) {
+    // The flag is set to NO.
     return NO;
   } else {
+    // The flag is not set or set to YES.
     FlutterViewController* flutterViewController = [self rootFlutterViewController];
     if (flutterViewController) {
       [flutterViewController.engine
