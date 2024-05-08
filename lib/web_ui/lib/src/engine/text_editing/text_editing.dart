@@ -332,7 +332,8 @@ class EngineAutofillForm {
 
     // In order to submit the form when Framework sends a `TextInput.commit`
     // message, we add a submit button to the form.
-    final DomHTMLInputElement submitButton = createDomHTMLInputElement();
+    // The -1 tab index value makes this element not reachable by keyboard.
+    final DomHTMLInputElement submitButton = createDomHTMLInputElement()..tabIndex = -1;
     _styleAutofillElements(submitButton, isOffScreen: true);
     submitButton.className = 'submitBtn';
     submitButton.type = 'submit';
@@ -1285,7 +1286,8 @@ abstract class DefaultTextEditingStrategy with CompositionAwareMixin implements 
   }) {
     assert(!isEnabled);
 
-    domElement = inputConfig.inputType.createDomElement();
+    // The -1 tab index value makes this element not reachable by keyboard.
+    domElement = inputConfig.inputType.createDomElement()..tabIndex = -1;
     applyConfiguration(inputConfig);
 
     _setStaticStyleAttributes(activeDomElement);
@@ -1416,14 +1418,13 @@ abstract class DefaultTextEditingStrategy with CompositionAwareMixin implements 
     }
     subscriptions.clear();
     removeCompositionEventHandlers(activeDomElement);
+    _moveFocusToFlutterView();
 
     // If focused element is a part of a form, it needs to stay on the DOM
     // until the autofill context of the form is finalized.
     // More details on `TextInput.finishAutofillContext` call.
     if (_appendedToForm &&
         inputConfiguration.autofillGroup?.formElement != null) {
-      // Subscriptions are removed, listeners won't be triggered.
-      activeDomElement.blur();
       _styleAutofillElements(activeDomElement, isOffScreen: true);
       inputConfiguration.autofillGroup?.storeForm();
     } else {
@@ -1571,6 +1572,19 @@ abstract class DefaultTextEditingStrategy with CompositionAwareMixin implements 
         DomSubscription(activeDomElement, 'mousemove', (DomEvent event) {
       event.preventDefault();
     }));
+  }
+
+  /// Moves the focus to the parent <flutter-view /> only if the [activeDomElement] has it.
+  void _moveFocusToFlutterView() {
+    if (activeDomElement == domDocument.activeElement) {
+      EnginePlatformDispatcher
+        .instance
+        .viewManager
+        .findViewForElement(activeDomElement)!
+        .dom
+        .rootElement
+        .focus();
+    }
   }
 }
 
